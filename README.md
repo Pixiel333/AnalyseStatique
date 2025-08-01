@@ -1,4 +1,3 @@
-````markdown
 # Analyseur PE Complet
 
 Ce projet est un script Python d'analyse complète de fichiers PE (Portable Executable) sous Windows.  
