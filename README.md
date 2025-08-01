@@ -19,15 +19,15 @@ Il propose plusieurs options pour analyser l'entropie, les ressources, les impor
 1. **Cloner le dépôt :**
 
 ```bash
-git clone https://github.com/ton-utilisateur/ton-repo.git
-cd ton-repo
+git clone https://github.com/Pixiel333/AnalyseStatique.git
+cd AnalyseStatique
 ````
 
 2. **Créer un environnement virtuel Python :**
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate  # Sur Windows : venv\Scripts\activate
+source venv/bin/activate
 ```
 
 3. **Installer les dépendances :**
@@ -35,14 +35,6 @@ source venv/bin/activate  # Sur Windows : venv\Scripts\activate
 ```bash
 pip3 install -r requirements.txt
 ```
-
-Le fichier `requirements.txt` contient :
-
-```
-yara-python
-pefile
-```
-
 ---
 
 ## Utilisation
@@ -97,4 +89,4 @@ python3 analyse.py -i samples/malware.exe -y
 
 ## Auteur
 
-Xylitol - [xylitol@temari.fr](mailto:xylitol@temari.fr)
+Pixiel333
