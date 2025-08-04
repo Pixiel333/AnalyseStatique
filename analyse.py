@@ -119,18 +119,15 @@ def extract_strings(data, min_length=4):
     return re.findall(pattern, data)
 
 def extract_strings_clean(data, min_length=4):
-    # Regex basique pour ASCII imprimables
     candidate_strings = re.findall(rb'[\x20-\x7E]{' + bytes(str(min_length), 'ascii') + rb',}', data)
 
     clean_strings = []
     for s in candidate_strings:
-        # Décoder en UTF-8 en ignorant erreurs
         try:
             decoded = s.decode('utf-8', errors='ignore')
         except:
             continue
 
-        # Filtrer chaînes avec trop de caractères non alphanumériques (max 30%)
         count_non_alnum = sum(1 for c in decoded if not c.isalnum() and not c.isspace() and c not in "-._:/\\")
         if count_non_alnum / max(len(decoded),1) > 0.3:
             continue
@@ -204,7 +201,6 @@ def main():
     parser.add_argument("-r", "--resources", action="store_true", help="Lister les types et nombre de ressources")
     parser.add_argument("-f", "--functions", action="store_true", help="Lister les DLL et fonctions importées")
     parser.add_argument("-s", "--sections", action="store_true", help="Lister les sections et leurs tailles")
-    parser.add_argument("-a", "--all", action="store_true", help="Effectuer toutes les analyses sauf DIE")
     parser.add_argument("-t", "--strings", action="store_true", help="Extraire strings et filtrer URLs, IP, domaines, dlls, binaires")
     parser.add_argument("--die", action="store_true", help="Lancer DIE et afficher son résultat (doit être installé)")
     parser.add_argument("-H", "--hash", action="store_true", help="Calculer MD5, SHA1, SHA256, SHA512")
@@ -213,7 +209,7 @@ def main():
 
     pe = pefile.PE(args.input)
 
-    if args.all:
+    if args.input and not any([args.entropy, args.resources, args.functions, args.sections, args.strings, args.hash]):
         args.entropy = True
         args.resources = True
         args.functions = True
@@ -278,7 +274,7 @@ def main():
         with open(args.input, 'rb') as f:
             data = f.read()
         strings = extract_strings_clean(data, 5)
-        filtered = filter_patterns([s.encode() for s in strings])  # filter_patterns attend des bytes
+        filtered = filter_patterns([s.encode() for s in strings])
         print("Strings extraites filtrées :")
         for k,v in filtered.items():
             print(f"  {k}:")
