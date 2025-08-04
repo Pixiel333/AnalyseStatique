@@ -39,7 +39,7 @@ pip3 install -r requirements.txt
 
 ## Utilisation
 
-Lancez le script principal avec l’option `-i` pour spécifier le fichier PE à analyser, et choisissez les options d’analyse souhaitées :
+Utilisez `-i` pour spécifier le fichier PE. Si aucune autre option n’est précisée, toutes les analyses seront lancées par défaut (hors DIE et YARA).
 
 ```bash
 python3 analyse.py -i <fichier_PE> [options]
@@ -54,7 +54,6 @@ python3 analyse.py -i <fichier_PE> [options]
 | `-r, --resources` | Liste les types et nombres de ressources                        |
 | `-f, --functions` | Liste les DLL et fonctions importées                            |
 | `-s, --sections`  | Liste les sections et leurs tailles                             |
-| `-a, --all`       | Effectue toutes les analyses sauf DIE                           |
 | `-t, --strings`   | Extrait les chaînes et filtre URLs, IP, domaines, DLL, binaires |
 | `--die`           | Lance DIE et affiche son résultat (doit être installé)          |
 | `-H, --hash`      | Calcule MD5, SHA1, SHA256, SHA512                               |
@@ -64,16 +63,16 @@ python3 analyse.py -i <fichier_PE> [options]
 
 ## Exemple
 
-Pour analyser un fichier avec toutes les options sauf DIE :
+Pour analyser un fichier avec toutes les options sauf DIE et YARA :
 
 ```bash
-python3 analyse.py -i samples/malware.exe -a
+python3 analyse.py -i path/to/app.exe
 ```
 
 Pour scanner uniquement avec YARA :
 
 ```bash
-python3 analyse.py -i samples/malware.exe -y
+python3 analyse.py -i path/to/app.exe -y
 ```
 
 ---
