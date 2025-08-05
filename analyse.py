@@ -9,6 +9,7 @@ import subprocess
 import yara
 import shutil
 import mimetypes
+from collections import defaultdict
 
 RED = "\033[31m"
 GREEN = "\033[32m"
@@ -16,6 +17,117 @@ YELLOW = "\033[33m"
 BLUE = "\033[34m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
+RESOURCE_TYPE = {
+    1: "CURSOR",
+    2: "BITMAP",
+    3: "ICON",
+    4: "MENU",
+    5: "DIALOG",
+    6: "STRING",
+    7: "FONTDIR",
+    8: "FONT",
+    9: "ACCELERATOR",
+    10: "RCDATA",
+    11: "MESSAGETABLE",
+    12: "GROUP_CURSOR",
+    14: "GROUP_ICON",
+    16: "VERSION",
+    17: "DLGINCLUDE",
+    19: "PLUGPLAY",
+    20: "VXD",
+    21: "ANICURSOR",
+    22: "ANIICON",
+    23: "HTML",
+    24: "MANIFEST"
+}
+LANGUAGE_NAMES = {
+    0x00: "NEUTRAL",
+    0x01: "DEFAULT",
+    0x09: "EN",
+    0x0C: "FR",
+    0x07: "DE",
+    0x0A: "ES",
+    0x10: "IT",
+    0x11: "JA",
+    0x04: "ZH",
+    0x0E: "HU",
+    0x19: "RU",
+}
+SUBLANGUAGE_NAMES = {
+    0x00: "DEFAULT",
+    0x01: "SYS_DEFAULT",
+    0x02: "USER_DEFAULT"
+}
+
+def get_resource_type(entry):
+    if entry.name is not None:
+        return str(entry.name)
+    return RESOURCE_TYPE.get(entry.struct.Id, f"ID:{entry.struct.Id}")
+
+def get_lang_name(lang):
+    return LANGUAGE_NAMES.get(lang, f"0x{lang:02X}")
+
+def get_sublang_name(sublang):
+    return SUBLANGUAGE_NAMES.get(sublang, f"0x{sublang:02X}")
+
+def guess_extension(res_type):
+    return {
+        "ICON": "ico",
+        "GROUP_ICON": "ico",
+        "MANIFEST": "xml",
+        "VERSION": "txt",
+        "DIALOG": "bin",
+        "RCDATA": "bin"
+    }.get(res_type.upper(), "bin")
+
+def analyze_resources(pe, output_dir=None):
+    if not hasattr(pe, 'DIRECTORY_ENTRY_RESOURCE'):
+        print("❌ Aucune ressource trouvée.")
+        return
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    print("📦 Ressources trouvées :")
+
+    total = 0
+    type_counter = defaultdict(int)
+    for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        res_type = get_resource_type(entry)
+
+        if hasattr(entry, 'directory'):
+            for res in entry.directory.entries:
+                for lang_entry in res.directory.entries:
+                    lang = lang_entry.data.lang if hasattr(lang_entry.data, 'lang') else 0
+                    sublang = lang_entry.data.sublang if hasattr(lang_entry.data, 'sublang') else 0
+                    lang_str = get_lang_name(lang)
+                    sublang_str = get_sublang_name(sublang)
+
+                    size = lang_entry.data.struct.Size
+                    rva = lang_entry.data.struct.OffsetToData
+                    data = pe.get_data(rva, size)
+
+                    print(f"  - Type: {res_type} | Langue: {lang_str}/{sublang_str} | Taille: {size} octets | RVA: {hex(rva)}")
+
+                    # Fichier de sortie
+                    if output_dir:
+                        filename = f"{res_type}_{type_counter[res_type]}.{guess_extension(res_type)}"
+                        filepath = os.path.join(output_dir, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(data)
+                    type_counter[res_type] += 1
+                    total += 1
+
+    print(f"\n🔢 Nombre total de ressources : {total}")
+    print("📊 Détail par type :")
+    for k, v in type_counter.items():
+        print(f"  - {k} : {v}")
+
+def extract_resources(pe, output_dir):
+    output_dir = output_dir
+    analyze_resources(pe, output_dir)
+
+    os.makedirs(output_dir, exist_ok=True)
+    print("\n📦 Extraction des ressources...")
+
 
 def collect_yara_rules_from_dirs(directories):
     rule_paths = {}
@@ -43,7 +155,7 @@ def scan_with_yara(target_file, rules_dirs):
         if not rule_files:
             print("⚠️  Aucune règle YARA trouvée dans les dossiers spécifiés.")
             return
-        
+
         rules = yara.compile(
             filepaths=rule_files,
             externals={
@@ -54,10 +166,19 @@ def scan_with_yara(target_file, rules_dirs):
                 "owner": "unknown_owner"
             }
         )
+
         matches = rules.match(target_file)
-        if matches:
-            print(GREEN + f"✔️  {len(matches)} règle(s) YARA ont matché :" + RESET)
-            for match in matches:
+
+        seen = set()
+        unique_matches = []
+        for m in matches:
+            if m.rule not in seen:
+                seen.add(m.rule)
+                unique_matches.append(m)
+
+        if unique_matches:
+            print(GREEN + f"✔️  {len(unique_matches)} règle(s) YARA ont matché :" + RESET)
+            for match in unique_matches:
                 print(RED + f" - {match.rule}" + RESET)
                 if 'description' in match.meta:
                     print(f"      Description : {match.meta['description']}")
@@ -69,7 +190,6 @@ def scan_with_yara(target_file, rules_dirs):
             print("❌  Aucune règle YARA n’a matché.")
     except yara.Error as e:
         print(RED + f"❌ Erreur lors du chargement YARA : {e}" + RESET)
-
 
 def print_delimiter():
     width = shutil.get_terminal_size((80, 20)).columns
@@ -176,23 +296,11 @@ def filter_patterns(strings):
 
 def run_die(filepath):
     try:
-        result = subprocess.run(['diec', '-r', filepath], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(['diec', '-r', filepath], capture_output=True, text=True, timeout=100)
         return result.stdout
     except Exception as e:
         return f"Erreur lors de l'exécution de DIE: {e}"
 
-def yara_scan(filepath, rules_path):
-    try:
-        rules = yara.compile(filepath=rules_path)
-        matches = rules.match(filepath)
-        if matches:
-            print("Correspondances YARA trouvées :")
-            for m in matches:
-                print(f"  - {m.rule}")
-        else:
-            print("Aucune correspondance YARA.")
-    except Exception as e:
-        print(f"Erreur lors du scan YARA: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Analyse PE complète avec options multiples")
@@ -205,11 +313,14 @@ def main():
     parser.add_argument("--die", action="store_true", help="Lancer DIE et afficher son résultat (doit être installé)")
     parser.add_argument("-H", "--hash", action="store_true", help="Calculer MD5, SHA1, SHA256, SHA512")
     parser.add_argument("-y", "--yara", action="store_true", help="Scanner avec les règles YARA locales")
+    parser.add_argument("-o","--extract",nargs="?",const="output/resources",help="Extraire les ressources dans un dossier (par défaut: output/resources)"
+)
+
     args = parser.parse_args()
 
     pe = pefile.PE(args.input)
 
-    if args.input and not any([args.entropy, args.resources, args.functions, args.sections, args.strings, args.hash]):
+    if args.input and not any([args.entropy, args.resources, args.functions, args.sections, args.strings, args.hash, args.yara, args.die, args.extract]):
         args.entropy = True
         args.resources = True
         args.functions = True
@@ -228,33 +339,14 @@ def main():
             print("Le fichier ne semble pas packé (entropie normale).")
 
     if args.resources:
-        if not hasattr(pe, 'DIRECTORY_ENTRY_RESOURCE'):
-            print("Pas de ressources dans ce fichier.")
-        else:
-            type_count = {}
-            total_resources = 0
+        analyze_resources(pe)
+        print_delimiter()
 
-            def count_resources(directory):
-                nonlocal total_resources
-                for entry in directory.entries:
-                    if entry.name is not None:
-                        res_type = str(entry.name)
-                    else:
-                        res_type = pefile.RESOURCE_TYPE.get(entry.struct.Id, str(entry.struct.Id))
-                    if hasattr(entry, 'directory'):
-                        count_resources(entry.directory)
-                    else:
-                        type_count[res_type] = type_count.get(res_type, 0) + 1
-                        total_resources += 1
-
-            count_resources(pe.DIRECTORY_ENTRY_RESOURCE)
-
-            print("Ressources trouvées :")
-            for t, c in type_count.items():
-                print(f"  {t}: {c}")
-            print(f"Nombre total de ressources: {total_resources}")
-            print_delimiter()
-
+    if args.extract:
+        output_dir = args.extract if args.extract != "output/resources" else "output/resources"
+        extract_resources(pe, output_dir)
+        print(f"Ressources extraites dans {output_dir}")
+        print_delimiter()
     if args.functions:
         print("DLL importées et fonctions associées:")
         for entry in pe.DIRECTORY_ENTRY_IMPORT:
