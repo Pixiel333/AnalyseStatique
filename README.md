@@ -58,6 +58,7 @@ python3 analyse.py -i <fichier_PE> [options]
 | `--die`           | Lance DIE et affiche son résultat (doit être installé)          |
 | `-H, --hash`      | Calcule MD5, SHA1, SHA256, SHA512                               |
 | `-y, --yara`      | Scanne avec les règles YARA locales                             |
+| `-o, --extract`   | Extrait les ressources dans un dossier (par défaut: output/resources) |
 
 ---
 
@@ -73,6 +74,12 @@ Pour scanner uniquement avec YARA :
 
 ```bash
 python3 analyse.py -i path/to/app.exe -y
+```
+
+Pour afficher et extraire les ressources dans un dossier (par défaut: output/resources)) :
+
+```bash
+python3 analyse.py -i path/to/app.exe -o path/to/output
 ```
 
 ---
