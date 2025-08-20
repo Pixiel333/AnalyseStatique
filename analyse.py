@@ -235,63 +235,69 @@ def get_hashes(filepath):
     return hashes
 
 def extract_strings(data, min_length=4):
-    pattern = rb'[\x20-\x7E]{' + bytes(str(min_length), 'ascii') + rb',}'
-    return re.findall(pattern, data)
-
-def extract_strings_clean(data, min_length=4):
     candidate_strings = re.findall(rb'[\x20-\x7E]{' + bytes(str(min_length), 'ascii') + rb',}', data)
-
     clean_strings = []
     for s in candidate_strings:
         try:
             decoded = s.decode('utf-8', errors='ignore')
-        except:
+        except Exception:
             continue
-
-        count_non_alnum = sum(1 for c in decoded if not c.isalnum() and not c.isspace() and c not in "-._:/\\")
-        if count_non_alnum / max(len(decoded),1) > 0.3:
+        count_non_alnum = sum(
+            1 for c in decoded if not c.isalnum() and not c.isspace() and c not in "-._:/\\"
+        )
+        if count_non_alnum / max(len(decoded), 1) > 0.3:
             continue
-
         clean_strings.append(decoded)
     return clean_strings
 
-def filter_patterns(strings):
-    urls = []
-    ips = []
-    domains = []
-    dlls = []
-    binaries = []
 
-    url_regex = re.compile(
-        rb'https?://(?:[a-zA-Z0-9\-\.]+\.)+[a-zA-Z]{2,6}(/[^\s\'"<>]*)?', re.IGNORECASE
-    )
+def filter_patterns(strings):
+    urls = set()
+    ips = set()
+    domains = set()
+    dlls = set()
+    binaries = set()
+
+    url_regex = re.compile(r'https?://[^\s\'"<>]+', re.IGNORECASE)
     ip_regex = re.compile(
-        rb'\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}'
-        rb'(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b'
+        r'\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}'
+        r'(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b'
     )
-    domain_regex = re.compile(rb'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+(?:com|net|org|info|biz|co|io|gov|edu|fr|de|jp|cn|uk|us|ru|in|xyz|top|club|site|online|store|tech|me|tv|cc|app|dev|ai|mobi|name|pro|cloud|page|agency)\b',re.IGNORECASE)
-    dll_regex = re.compile(rb'\b[\w\-]+\.(dll)\b', re.IGNORECASE)
-    bin_regex = re.compile(rb'\b[\w\-]+\.(exe|bin|dat|sys|drv)\b', re.IGNORECASE)
+    domain_regex = re.compile(
+        r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+'
+        r'(com|net|org|info|biz|co|io|gov|edu|fr|de|jp|cn|uk|us|ru|in|xyz|top|club|site|online|store|tech|me|tv|cc|app|dev|ai|mobi|name|pro|cloud|page|agency)\b',
+        re.IGNORECASE
+    )
+    dll_regex = re.compile(r'\b[\w\-]+\.dll\b', re.IGNORECASE)
+    bin_regex = re.compile(r'\b[\w\-]+\.(exe|bin|dat|sys|drv)\b', re.IGNORECASE)
 
     for s in strings:
-        if url_regex.search(s):
-            urls.append(s.decode(errors='ignore'))
-        if ip_regex.search(s):
-            ips.append(s.decode(errors='ignore'))
-        if domain_regex.search(s):
-            domains.append(s.decode(errors='ignore'))
-        if dll_regex.search(s):
-            dlls.append(s.decode(errors='ignore'))
-        if bin_regex.search(s):
-            binaries.append(s.decode(errors='ignore'))
+        # URLs
+        for match in url_regex.findall(s):
+            urls.add(match)
+        # IPs
+        for match in ip_regex.findall(s):
+            ips.add(match)
+        # Domains
+        for match in domain_regex.findall(s):
+            domain_match = re.search(r'([a-zA-Z0-9\-\.]+\.' + match + r')\b', s, re.IGNORECASE)
+            if domain_match:
+                domain = domain_match.group(1)
+                if not any(domain in url for url in urls):
+                    domains.add(domain)
+        # DLLs
+        for match in dll_regex.findall(s):
+            dlls.add(match)
+        # Binaries
+        for match in bin_regex.findall(s):
+            binaries.add(match)
 
-    # Deduplication
     return {
-        'urls': list(set(urls)),
-        'ips': list(set(ips)),
-        'domains': list(set(domains)),
-        'dlls': list(set(dlls)),
-        'binaries': list(set(binaries)),
+        'urls': sorted(urls),
+        'ips': sorted(ips),
+        'domains': sorted(domains),
+        'dlls': sorted(dlls),
+        'binaries': sorted(binaries),
     }
 
 def run_die(filepath):
@@ -365,14 +371,15 @@ def main():
     if args.strings:
         with open(args.input, 'rb') as f:
             data = f.read()
-        strings = extract_strings_clean(data, 5)
-        filtered = filter_patterns([s.encode() for s in strings])
+        strings = extract_strings(data, 5)
+        filtered = filter_patterns(strings)
         print("Strings extraites filtrées :")
-        for k,v in filtered.items():
+        for k, v in filtered.items():
             print(f"  {k}:")
             for item in v:
                 print(f"    {item}")
         print_delimiter()
+
 
     if args.hash:
         hashes = get_hashes(args.input)
