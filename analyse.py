@@ -438,10 +438,10 @@ def main():
     parser.add_argument("-s", "--sections", action="store_true", help="Lister les sections et leurs tailles")
     parser.add_argument("-t", "--strings", action="store_true", help="Extraire strings et filtrer URLs, IP, domaines, dlls, binaires")
     parser.add_argument("--die", action="store_true", help="Lancer DIE et afficher son résultat (doit être installé)")
+    parser.add_argument("--diegui", action="store_true", help="Lancer DIE en mode graphique avec le fichier PE")
     parser.add_argument("-H", "--hash", action="store_true", help="Calculer MD5, SHA1, SHA256, SHA512")
     parser.add_argument("-y", "--yara", action="store_true", help="Scanner avec les règles YARA locales")
     parser.add_argument("-o","--extract",nargs="?",const="output/resources",help="Extraire les ressources dans un dossier (par défaut: output/resources)")
-    parser.add_argument("--diegui", action="store_true", help="Lancer DIE en mode graphique avec le fichier PE")
     
     tmp_dir = tempfile.mkdtemp()
     args = parser.parse_args()

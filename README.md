@@ -49,13 +49,14 @@ python3 analyse.py -i <fichier_PE> [options]
 
 | Option            | Description                                                     |
 | ----------------- | --------------------------------------------------------------- |
-| `-i, --input`     | **(Obligatoire)** Chemin vers le fichier PE                     |
+| `-i, --input`     | **(Obligatoire)** Chemin vers le fichier PE, MSI ou ZIP         |
 | `-e, --entropy`   | Affiche l’entropie et détecte un packer                         |
 | `-r, --resources` | Liste les types et nombres de ressources                        |
 | `-f, --functions` | Liste les DLL et fonctions importées                            |
 | `-s, --sections`  | Liste les sections et leurs tailles                             |
 | `-t, --strings`   | Extrait les chaînes et filtre URLs, IP, domaines, DLL, binaires |
 | `--die`           | Lance DIE et affiche son résultat (doit être installé)          |
+| `--diegui`           | Lance DIE en mode graphique avec le fichier                     |
 | `-H, --hash`      | Calcule MD5, SHA1, SHA256, SHA512                               |
 | `-y, --yara`      | Scanne avec les règles YARA locales                             |
 | `-o, --extract`   | Extrait les ressources dans un dossier (par défaut: output/resources) |
