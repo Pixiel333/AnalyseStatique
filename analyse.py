@@ -17,6 +17,7 @@ import mimetypes
 import pymsi
 from collections import defaultdict
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -582,14 +583,17 @@ def main():
 
     # ---- YARA ----
     if args.yara:
-        output = with_spinner(lambda: scan_with_yara(input_path, [
-            "yara_rules/signature-base/yara",
-            "yara_rules/custom",
-            "yara_rules/rules"
-        ]), "Analyse YARA en cours...")
+        rules_dirs = [
+            os.path.join(BASE_DIR, "yara_rules", "signature-base", "yara"),
+            os.path.join(BASE_DIR, "yara_rules", "custom"),
+            os.path.join(BASE_DIR, "yara_rules", "rules")
+        ]
+        output = with_spinner(lambda: scan_with_yara(input_path, rules_dirs),
+                              "Analyse YARA en cours...")
         print("YARA Analyse terminée : ")
         print(output)
         print_delimiter()
+
     
     shutil.rmtree(tmp_dir)
 
