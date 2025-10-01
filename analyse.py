@@ -19,6 +19,7 @@ from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.stdout.reconfigure(encoding='utf-8')
+
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -79,10 +80,10 @@ def with_spinner(task_fn, message="Chargement..."):
         for c in itertools.cycle(['|', '/', '-', '\\']):
             if stop_event.is_set():
                 break
-            sys.stdout.write(f"\r{message} {c}")
-            sys.stdout.flush()
+            sys.stderr.write(f"\r{message} {c}")
+            sys.stderr.flush()
             time.sleep(0.1)
-        sys.stdout.write(f"\r{message} terminé !   \n")
+        sys.stderr.write(f"\r{message} terminé !   \n")
 
     thread = threading.Thread(target=spinner)
     thread.start()
