@@ -18,6 +18,7 @@ import pymsi
 from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.stdout.reconfigure(encoding='utf-8')
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
