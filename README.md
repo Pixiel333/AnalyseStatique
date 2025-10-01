@@ -30,6 +30,13 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
+Windows (Powershell) :
+```bash
+python3 -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+
 3. **Installer les dépendances :**
 
 ```bash
@@ -39,10 +46,10 @@ pip3 install -r requirements.txt
 
 ## Utilisation
 
-Utilisez `-i` pour spécifier le fichier PE. Si aucune autre option n’est précisée, toutes les analyses seront lancées par défaut (hors DIE et YARA).
+Utilisez `-i` pour spécifier le fichier. Si aucune autre option n’est précisée, toutes les analyses seront lancées par défaut (hors DIE et YARA).
 
 ```bash
-python3 analyse.py -i <fichier_PE> [options]
+python3 analyse.py -i <fichier> [options]
 ```
 
 ### Options disponibles :
