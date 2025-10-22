@@ -68,14 +68,15 @@ SUBLANGUAGE_NAMES = {
     0x02: "USER_DEFAULT"
 }
 
-def with_spinner(task_fn, message="Chargement..."):
+def with_spinner(task_fn, message="Chargement...", report_mode=False):
     """
     Exécute une fonction avec un spinner animé tant qu'elle tourne.
     - task_fn: fonction à exécuter
     - message: texte affiché avant le spinner
     """
     stop_event = threading.Event()
-
+    if report_mode:
+        return task_fn()
     def spinner():
         for c in itertools.cycle(['|', '/', '-', '\\']):
             if stop_event.is_set():
@@ -431,42 +432,39 @@ def run_die_gui(filepath):
             return "❌ DIE GUI introuvable (binaire 'die' non présent dans le PATH)."
         except Exception as e:
             return f"Erreur lors du lancement de DIE GUI: {e}"
+def write_report(text, filename):
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(text)
 
-def main():
-    parser = argparse.ArgumentParser(description="Analyse PE complète avec options multiples")
-    parser.add_argument("-i", "--input", required=True, help="Fichier PE à analyser")
-    parser.add_argument("-e", "--entropy", action="store_true", help="Afficher l'entropie et détection pack")
-    parser.add_argument("-r", "--resources", action="store_true", help="Lister les types et nombre de ressources")
-    parser.add_argument("-f", "--functions", action="store_true", help="Lister les DLL et fonctions importées")
-    parser.add_argument("-s", "--sections", action="store_true", help="Lister les sections et leurs tailles")
-    parser.add_argument("-t", "--strings", action="store_true", help="Extraire strings et filtrer URLs, IP, domaines, dlls, binaires")
-    parser.add_argument("--die", action="store_true", help="Lancer DIE et afficher son résultat (doit être installé)")
-    parser.add_argument("--diegui", action="store_true", help="Lancer DIE en mode graphique avec le fichier PE")
-    parser.add_argument("-H", "--hash", action="store_true", help="Calculer MD5, SHA1, SHA256, SHA512")
-    parser.add_argument("-y", "--yara", action="store_true", help="Scanner avec les règles YARA locales")
-    parser.add_argument("-o","--extract",nargs="?",const="output/resources",help="Extraire les ressources dans un dossier (par défaut: output/resources)")
-    
-    tmp_dir = tempfile.mkdtemp()
-    args = parser.parse_args()
-    if args.input and not any([args.entropy, args.resources, args.functions, args.sections, args.strings, args.hash, args.yara, args.die, args.extract, args.diegui]):
-        args.entropy = True
-        args.resources = True
-        args.functions = True
-        args.sections = True
-        args.strings = True
-        args.hash = True
-    
+def analyze_file(input_path, args, tmp_dir):
+    report_mode = args.report is not None
+    if args.report:
+        import io
+        if args.report is True or args.report is None:
+            base_name = input_path.split(os.sep)[-1]
+            report_path = os.path.join(os.getcwd(), f"{base_name}_rapport.txt")
+            # how to redirect stdout on a file like  > in linux report_path 
+            buffer = io.StringIO()
+            old_stdout = sys.stdout
+            sys.stdout = buffer
+            print(f"✅ Rapport sera écrit dans : {report_path}")
+            print_delimiter()
+            print(f"Analyse du fichier : {input_path}\n")
+            print_delimiter()
+
+        #else:
+            #report_path = os.path.abspath(args.report)
+        
 
     pe_files = []
-    general_files = []
-    input_path = args.input
+    general_files=[]
     if input_path.lower().endswith('.zip'):
-        pe_files = with_spinner(lambda: extract_pe_from_zip(input_path, tmp_dir), "Extraction du ZIP...")
+        pe_files = with_spinner(lambda: extract_pe_from_zip(input_path, tmp_dir), "Extraction du ZIP...", report_mode=report_mode)
         general_files = [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if not f.lower().endswith((".exe", ".dll", ".sys"))]
     elif input_path.lower().endswith('.msi'):
         tmp_msi_dir = os.path.join(tmp_dir, "msi_extracted")
         os.makedirs(tmp_msi_dir, exist_ok=True)
-        pe_files = with_spinner(lambda: extract_pe_from_msi(input_path, tmp_msi_dir), "Extraction du MSI...")
+        pe_files = with_spinner(lambda: extract_pe_from_msi(input_path, tmp_msi_dir), "Extraction du MSI...", report_mode=report_mode)
         general_files = []
         for root, _, files in os.walk(tmp_msi_dir):
             for f in files:
@@ -474,7 +472,7 @@ def main():
                 if not f.lower().endswith((".exe", ".dll", ".sys")):
                     general_files.append(full_path)
     else:
-        is_pe_file, pe = with_spinner(lambda: is_pe(input_path), "Chargement du fichier...")
+        is_pe_file, pe = with_spinner(lambda: is_pe(input_path), "Chargement du fichier...", report_mode=report_mode)
         if is_pe_file:
             pe_files = [input_path]
         else:
@@ -490,7 +488,7 @@ def main():
         if args.entropy:
             with open(pe_file, "rb") as f:
                 data = f.read()
-            entropy = with_spinner(lambda: calculate_entropy(data), "Calcul de l'entropie...")
+            entropy = with_spinner(lambda: calculate_entropy(data), "Calcul de l'entropie...", report_mode=report_mode)
             print(f"Entropie globale du fichier: {entropy:.2f}")
             if entropy > 7.0:
                 print("Le fichier semble packé (entropie élevée).")
@@ -498,18 +496,18 @@ def main():
                 print("Le fichier ne semble pas packé (entropie normale).")
 
         if args.resources:
-            with_spinner(lambda: analyze_resources(pe), "Analyse des ressources...")
+            with_spinner(lambda: analyze_resources(pe), "Analyse des ressources...", report_mode=report_mode)
             print("Analyse des ressources terminée.")
             print_delimiter()
 
         if args.extract:
             output_dir = args.extract if args.extract != "output/resources" else "output/resources"
-            with_spinner(lambda:extract_resources(pe, output_dir), f"Extraction des ressources vers {output_dir}...")
+            with_spinner(lambda:extract_resources(pe, output_dir), f"Extraction des ressources vers {output_dir}...",  report_mode=report_mode)
             print(f"Extraction des ressources terminée. Fichiers extraits dans: {output_dir}")
             print_delimiter()
 
         if args.functions:
-            functions = with_spinner(lambda: get_functions(pe), "Collecte des fonctions importées...")
+            functions = with_spinner(lambda: get_functions(pe), "Collecte des fonctions importées...", report_mode=report_mode)
             display_functions(functions)
             print_delimiter()
             display_dll_summary(functions)
@@ -524,8 +522,8 @@ def main():
         if args.strings:
             with open(pe_file, 'rb') as f:
                 data = f.read()
-            strings = with_spinner(lambda: extract_strings(data, 5), "Extraction des chaines de caractères...")
-            filtered = with_spinner(lambda: filter_patterns(strings), "Filtrage des patterns intéressants...")
+            strings = with_spinner(lambda: extract_strings(data, 5), "Extraction des chaines de caractères...", report_mode=report_mode)
+            filtered = with_spinner(lambda: filter_patterns(strings), "Filtrage des patterns intéressants...", report_mode=report_mode)
             print("Chaines de caractères extraites filtrées :")
             for k, v in filtered.items():
                 print(f"  {k}:")
@@ -534,8 +532,8 @@ def main():
             print_delimiter()
 
         if args.hash:
-            hashes = with_spinner(lambda: get_hashes(pe_file), "Calcul des hashes...")
-            print("Hashes du fichier:")
+            hashes = with_spinner(lambda: get_hashes(pe_file), "Calcul des hashes...", report_mode=report_mode)
+            print(f"Hashes de {str(pe_file).split(os.sep)[-1]}:")
             for k, v in hashes.items():
                 print(f"  {k.upper()}: {v}")
             print_delimiter()
@@ -545,7 +543,7 @@ def main():
         print(f"\n🔹 Analyse générale : {gen_file}")
 
         if args.hash:
-            hashes = with_spinner(lambda: get_hashes(gen_file), "Calcul des hashes généraux...")
+            hashes = with_spinner(lambda: get_hashes(gen_file), "Calcul des hashes généraux...", report_mode=report_mode)
             print("Hashes :")
             for k, v in hashes.items():
                 print(f"  {k.upper()}: {v}")
@@ -554,7 +552,7 @@ def main():
         if args.entropy:
             with open(gen_file, "rb") as f:
                 data = f.read()
-            entropy = with_spinner(lambda: calculate_entropy(data), "Calcul de l'entropie...")
+            entropy = with_spinner(lambda: calculate_entropy(data), "Calcul de l'entropie...", report_mode=report_mode)
             print(f"Entropie globale du fichier: {entropy:.2f}")
             if entropy > 7.0:
                 print("Le fichier semble packé (entropie élevée).")
@@ -564,8 +562,8 @@ def main():
         if args.strings:
             with open(gen_file, 'rb') as f:
                 data = f.read()
-            strings = with_spinner(lambda: extract_strings(data, 5), "Extraction des strings générales...")
-            filtered = with_spinner(lambda: filter_patterns(strings), "Filtrage des patterns générales...")
+            strings = with_spinner(lambda: extract_strings(data, 5), "Extraction des strings générales...", report_mode=report_mode)
+            filtered = with_spinner(lambda: filter_patterns(strings), "Filtrage des patterns générales...", report_mode=report_mode)
             for k, v in filtered.items():
                 print(f"{k}:")
                 for item in v:
@@ -574,12 +572,12 @@ def main():
 
     # ---- DIE ----
     if args.die:
-        output = with_spinner(lambda: run_die(input_path), "Exécution de DIE...")
+        output = with_spinner(lambda: run_die(input_path), "Exécution de DIE...", report_mode=report_mode)
         print(output)
         print_delimiter()
 
     if args.diegui:
-        msg = with_spinner(lambda: run_die_gui(input_path), "Ouverture de DIE en mode graphique...")
+        msg = with_spinner(lambda: run_die_gui(input_path), "Ouverture de DIE en mode graphique...", report_mode=report_mode)
         print(msg)
         print_delimiter()
 
@@ -590,14 +588,59 @@ def main():
             os.path.join(BASE_DIR, "yara_rules", "custom"),
             os.path.join(BASE_DIR, "yara_rules", "rules")
         ]
-        output = with_spinner(lambda: scan_with_yara(input_path, rules_dirs),
-                              "Analyse YARA en cours...")
+        output = with_spinner(lambda: scan_with_yara(input_path, rules_dirs),"Analyse YARA en cours...", report_mode=report_mode)
         print("YARA Analyse terminée : ")
         print(output)
         print_delimiter()
 
+    if args.report:
+        sys.stdout = old_stdout
+        write_report(buffer.getvalue(), report_path)
+        buffer.close()
+        print(f"✅ Rapport écrit dans : {report_path}")
+
     
+
+def main():
+    parser = argparse.ArgumentParser(description="Analyse PE complète avec options multiples")
+    parser.add_argument("-i", "--input", required=True, help="Fichier PE à analyser")
+    parser.add_argument("-e", "--entropy", action="store_true", help="Afficher l'entropie et détection pack")
+    parser.add_argument("-r", "--resources", action="store_true", help="Lister les types et nombre de ressources")
+    parser.add_argument("-f", "--functions", action="store_true", help="Lister les DLL et fonctions importées")
+    parser.add_argument("-s", "--sections", action="store_true", help="Lister les sections et leurs tailles")
+    parser.add_argument("-t", "--strings", action="store_true", help="Extraire strings et filtrer URLs, IP, domaines, dlls, binaires")
+    parser.add_argument("--die", action="store_true", help="Lancer DIE et afficher son résultat (doit être installé)")
+    parser.add_argument("--diegui", action="store_true", help="Lancer DIE en mode graphique avec le fichier PE")
+    parser.add_argument("-H", "--hash", action="store_true", help="Calculer MD5, SHA1, SHA256, SHA512")
+    parser.add_argument("-y", "--yara", action="store_true", help="Scanner avec les règles YARA locales")
+    parser.add_argument("-o","--extract",nargs="?",const="output/resources",help="Extraire les ressources dans un dossier (par défaut: output/resources)")
+    parser.add_argument("--report",nargs="?",const=True,default=None,help="Écrire tout le résultat dans un fichier (chemin complet ou nom de fichier, défaut: rapportStatique.txt)")
+    
+
+    tmp_dir = tempfile.mkdtemp()
+    args = parser.parse_args()
+    if args.input and not any([args.entropy, args.resources, args.functions, args.sections, args.strings, args.hash, args.yara, args.die, args.extract, args.diegui]):
+        args.entropy = True
+        args.resources = True
+        args.functions = True
+        args.sections = True
+        args.strings = True
+        args.hash = True
+    
+    input_path = args.input
+    
+    # is directory
+    if input_path and os.path.isdir(input_path):
+        for root, _, files in os.walk(input_path):
+            for f in files:
+                analyze_file(os.path.join(root, f), args, tmp_dir)
+    else:
+        analyze_file(input_path, args, tmp_dir)
+
     shutil.rmtree(tmp_dir)
+
+            
+    
 
 if __name__ == "__main__":
     main()
